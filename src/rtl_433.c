@@ -362,6 +362,7 @@ static void sdr_callback(unsigned char *iq_buf, uint32_t len, void *ctx)
         }
         while (package_type) {
             int p_events = 0; // Sensor events successfully detected per package
+            uint64_t priorOffset = demod->pulse_data.offset;
             package_type = pulse_detect_package(demod->pulse_detect, demod->am_buf, demod->buf.fm, n_samples, demod->level_limit, cfg->samp_rate, cfg->input_pos, &demod->pulse_data, &demod->fsk_pulse_data, fpdm);
             if (package_type) {
                 // new package: set a first frame start if we are not tracking one already
@@ -370,6 +371,11 @@ static void sdr_callback(unsigned char *iq_buf, uint32_t len, void *ctx)
                 // always update the last frame end
                 demod->frame_end_ago = demod->pulse_data.end_ago;
             }
+            else if (demod->pulse_data.end_ago == 0 && priorOffset != demod->pulse_data.offset ) {
+               // We started a new package. Process everything that we have so far.
+               run_ook_demods(&demod->r_devs, &demod->pulse_data);
+           }
+
             if (package_type == PULSE_DATA_OOK) {
                 calc_rssi_snr(cfg, &demod->pulse_data);
                 if (demod->analyze_pulses) fprintf(stderr, "Detected OOK package\t%s\n", time_pos_str(cfg, demod->pulse_data.start_ago, time_str));
